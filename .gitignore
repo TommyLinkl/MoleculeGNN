@@ -1,0 +1,6 @@
+Papers/
+data/
+*.lyx
+*~
+*.pyc
+.DS_Store
