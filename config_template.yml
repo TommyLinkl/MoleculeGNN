@@ -1,0 +1,54 @@
+Job:
+    run_mode: "Training"  
+    # Training:
+    job_name: "my_train_job"
+    output_directory: "CALCS/test_results/"
+    load_model: "False"
+    save_model: "True"
+    model_path: "my_model.pth"
+    target_index: 0
+    verbosity: 5
+    # Predict:
+    job_name: "my_predict_job"
+    output_directory: "CALCS/test_results/"
+    model_path: "my_model.pth"
+    target_index: 0
+    verbosity: 5
+    # Hyperparameter:
+    job_name: "my_hyperparameter_job"
+    output_directory: "CALCS/test_results/"
+    ###specific options   
+    hyper_trials: 10
+    #number of concurrent trials (can be greater than number of GPUs)
+    hyper_concurrency: 8
+    #frequency of checkpointing and update (default: 1)
+    hyper_iter: 1
+    #resume a previous hyperparameter optimization run
+    hyper_resume: "True"
+    #Verbosity of ray tune output; available: (1, 2, 3)
+    hyper_verbosity: 1
+    #Delete processed datasets
+    hyper_delete_processed: "True"
+    target_index: 0
+    verbosity: 5
+
+Model:
+    model: SchNet     # model: MEGNet
+    dim1: 100
+    dim2: 100
+    dim3: 150
+    cutoff: 8
+    pre_fc_count: 1
+    gc_count: 4
+    # gc_fc_count: 1
+    post_fc_count: 3
+    pool: "global_mean_pool"
+    dropout_rate: 0.0
+    num_epochs: 10    # 250
+    lr: 0.0005
+    batch_size: 100
+    optimizer: "AdamW"
+    optimizer_args: {}
+    scheduler: "ReduceLROnPlateau"
+    scheduler_args: {"mode":"min", "factor":0.8, "patience":10, "min_lr":0.00001, "threshold":0.0002}
+    early_stopping_patience: 10

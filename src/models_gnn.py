@@ -7,12 +7,7 @@ from torch_geometric.nn.models.schnet import InteractionBlock
 from torch.nn import Sequential, Linear, BatchNorm1d
 from torch_scatter import scatter_mean, scatter
 
-###################################
-# Activation function must be relu. No longer adjustable from input
-# pool doesn't allow "set2set" any more!!!
-# batch_norm is always True!!!
-# pool_order is always "early"
-###################################
+
 class SchNet(nn.Module):
     def __init__(
         self,
@@ -95,17 +90,12 @@ class SchNet(nn.Module):
         return out.view(-1) if out.shape[1] == 1 else out
 
 
-###################################
-# Activation function must be relu. No longer adjustable from input
-# pool doesn't allow "set2set" any more!!!
-# batch_norm is always True!!!
-# pool_order is always "early"
-###################################
+
 class Megnet_EdgeModel(torch.nn.Module):
-    def __init__(self, dim, batch_track_stats, dropout_rate, fc_layers=2):
+    def __init__(self, dim, dropout_rate, fc_layers=2):
         super(Megnet_EdgeModel, self).__init__()
         self.fc_layers = fc_layers
-        self.batch_track_stats = bool(batch_track_stats)
+        self.batch_track_stats = True
         self.dropout_rate = dropout_rate
         
         self.edge_mlp = torch.nn.ModuleList()
@@ -131,10 +121,10 @@ class Megnet_EdgeModel(torch.nn.Module):
 
 
 class Megnet_NodeModel(torch.nn.Module):
-    def __init__(self, dim, batch_track_stats, dropout_rate, fc_layers=2):
+    def __init__(self, dim, dropout_rate, fc_layers=2):
         super(Megnet_NodeModel, self).__init__()
         self.fc_layers = fc_layers
-        self.batch_track_stats = bool(batch_track_stats)
+        self.batch_track_stats = True
         self.dropout_rate = dropout_rate
                 
         self.node_mlp = torch.nn.ModuleList()
@@ -166,10 +156,10 @@ class Megnet_NodeModel(torch.nn.Module):
     
 
 class Megnet_GlobalModel(torch.nn.Module):
-    def __init__(self, dim, batch_track_stats, dropout_rate, fc_layers=2):
+    def __init__(self, dim, dropout_rate, fc_layers=2):
         super(Megnet_GlobalModel, self).__init__()
         self.fc_layers = fc_layers
-        self.batch_track_stats = bool(batch_track_stats)
+        self.batch_track_stats = True
         self.dropout_rate = dropout_rate
                 
         self.global_mlp = torch.nn.ModuleList()
@@ -210,12 +200,11 @@ class MEGNet(torch.nn.Module):
         gc_fc_count=2,
         post_fc_count=1,
         pool="global_mean_pool",
-        batch_track_stats="True",
         dropout_rate=0.0,
     ):
         super(MEGNet, self).__init__()
         
-        self.batch_track_stats = bool(batch_track_stats)
+        self.batch_track_stats = True
         self.pool = pool
         if pool == "global_mean_pool":
             self.pool_reduce="mean"

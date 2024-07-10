@@ -11,7 +11,7 @@ class QM9Dataset:
         self.batch_size = batch_size
 
         self.dataset = QM9(self.root, pre_transform=Distance())
-        print(f"Number of data instances: {len(self.dataset)}")
+        print(f"Number of data instances: {len(self.dataset)}\n")
 
 
     def process_dataset(self, target=4, verbosity=0):

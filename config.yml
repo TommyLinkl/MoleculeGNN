@@ -1,0 +1,30 @@
+Job:
+    run_mode: "Training"  
+    job_name: "my_train_job"
+    output_directory: "CALCS/test_results/"
+    load_model: "False"
+    save_model: "True"
+    model_path: "my_model.pth"
+    target_index: 0
+    verbosity: 5
+    
+Model:
+    model: SchNet     # model: MEGNet
+    dim1: 100
+    dim2: 100
+    dim3: 150
+    cutoff: 8
+    pre_fc_count: 1
+    gc_count: 4
+    # gc_fc_count: 1
+    post_fc_count: 3
+    pool: "global_mean_pool"
+    dropout_rate: 0.0
+    num_epochs: 10    # 250
+    lr: 0.0005
+    batch_size: 100
+    optimizer: "AdamW"
+    optimizer_args: {}
+    scheduler: "ReduceLROnPlateau"
+    scheduler_args: {"mode":"min", "factor":0.8, "patience":10, "min_lr":0.00001, "threshold":0.0002}
+    early_stopping_patience: 10
