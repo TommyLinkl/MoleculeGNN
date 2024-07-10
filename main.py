@@ -9,23 +9,25 @@ from src.train_eval import train, evaluate, plot_training_validation_cost
 
 def main():
     # NVIDIA , CUDA support / MPS (Apple Silicon GPU) support
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        print("MPS is available. \n")
-        device = torch.device('mps')
-    elif torch.cuda.is_available():
-        print("CUDA GPU is available. \n")
+    if torch.cuda.is_available():
+        print("CUDA GPU is available. ")
         device = torch.device('cuda')
+        num_gpus = torch.cuda.device_count()
+        print(f"Using {num_gpus} GPU(s). \n")
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        print("MPS is available. ")
+        device = torch.device('mps')
+        num_gpus = 1  # MPS typically uses a single GPU
+        print("Using 1 GPU (MPS). \n")
     else:
         print("Only CPU is available. This will be slow. \n")
         device = torch.device('cpu')
-    device = torch.device('cpu')
     
     # Reading calculation information + hyperparameters
     with open('config.yml', 'r') as file:
         config = yaml.safe_load(file)
     print(f"Done reading in the config.yml file. The job type is {config['Job']['run_mode']}. The model is {config['Model']['model']}. \n")
     num_epochs = config['Model']['num_epochs']
-
     os.makedirs(config['Job']['output_directory'], exist_ok = True)
 
     dataset = QM9Dataset(root='./data/QM9', batch_size=config['Model']['batch_size'])
@@ -41,6 +43,8 @@ def main():
     model_class = MODEL_CLASSES.get(config['Model']['model'])
     if model_class:
         model = model_class(data)   # Initialize SchNet with a single instance of data, since the construction of the GNN models require a data instance
+        if (device.type == 'cuda') or (device.type == 'mps'):
+            model = nn.DataParallel(model)
         model = model.to(device)
     else:
         raise NotImplementedError(f"Model {config['Model']['model']} not implemented.")
@@ -82,7 +86,7 @@ def main():
                 'full_model': model,
             }, f"{config['Job']['output_directory']}best_model.pth")
 
-        # Early stopping logic
+        # Early stopping
         if epoch - best_epoch > config['Model']['early_stopping_patience']:
             print(f"Early stopping at epoch {epoch + 1} as validation loss has not improved for {config['Model']['early_stopping_patience']} epochs.")
             break

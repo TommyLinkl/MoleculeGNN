@@ -22,7 +22,7 @@ Model:
     dropout_rate: 0.0
     num_epochs: 10    # 250
     lr: 0.0005
-    batch_size: 100
+    batch_size: 4096     # for NVIDIA A100's
     optimizer: "AdamW"
     optimizer_args: {}
     scheduler: "ReduceLROnPlateau"
