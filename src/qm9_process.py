@@ -26,6 +26,9 @@ class QM9Dataset:
             data.num_node_features = data.x.size(1)  # Number of features per node
             data.num_edge_features = data.edge_attr.size(1)  # Number of features per edge
 
+            # Set global (molecular) feature tensor as a placeholder
+            data.u = torch.zeros(1, 3)  # Adjust the shape according to your requirement
+
             # Handle edge_weight
             if data.edge_weight is None:
                 data.edge_weight = torch.ones_like(data.edge_index[0])  # Set edge weights to 1.0 if not provided

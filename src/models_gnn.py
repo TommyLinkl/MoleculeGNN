@@ -4,7 +4,7 @@ from torch_geometric.nn import MessagePassing, GCNConv, GATConv
 import torch_geometric
 from torch_geometric.nn import Set2Set, MetaLayer
 from torch_geometric.nn.models.schnet import InteractionBlock
-from torch.nn import Sequential, Linear, BatchNorm1d
+from torch.nn import Sequential, Linear, BatchNorm1d, ReLU
 from torch_scatter import scatter_mean, scatter
 
 
@@ -242,31 +242,31 @@ class MEGNet(torch.nn.Module):
         self.bn_list = torch.nn.ModuleList()
         for i in range(gc_count):
             if i == 0:
-                e_embed = Sequential(Linear(data.num_edge_features, dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
-                x_embed = Sequential(Linear(gc_dim, dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
-                u_embed = Sequential(Linear((data[0].u.shape[1]), dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
+                e_embed = Sequential(Linear(data.num_edge_features, dim3), ReLU(), Linear(dim3, dim3), ReLU())
+                x_embed = Sequential(Linear(gc_dim, dim3), ReLU(), Linear(dim3, dim3), ReLU())
+                u_embed = Sequential(Linear((data[0].u.shape[1]), dim3), ReLU(), Linear(dim3, dim3), ReLU())
                 self.e_embed_list.append(e_embed)
                 self.x_embed_list.append(x_embed)
                 self.u_embed_list.append(u_embed)
                 self.conv_list.append(
                     MetaLayer(
-                        Megnet_EdgeModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
-                        Megnet_NodeModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
-                        Megnet_GlobalModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
+                        Megnet_EdgeModel(dim3, self.dropout_rate, gc_fc_count),
+                        Megnet_NodeModel(dim3, self.dropout_rate, gc_fc_count),
+                        Megnet_GlobalModel(dim3, self.dropout_rate, gc_fc_count),
                     )
                 )
             elif i > 0:
-                e_embed = Sequential(Linear(dim3, dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
-                x_embed = Sequential(Linear(dim3, dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
-                u_embed = Sequential(Linear(dim3, dim3), torch.relu(), Linear(dim3, dim3), torch.relu())
+                e_embed = Sequential(Linear(dim3, dim3), ReLU(), Linear(dim3, dim3), ReLU())
+                x_embed = Sequential(Linear(dim3, dim3), ReLU(), Linear(dim3, dim3), ReLU())
+                u_embed = Sequential(Linear(dim3, dim3), ReLU(), Linear(dim3, dim3), ReLU())
                 self.e_embed_list.append(e_embed)
                 self.x_embed_list.append(x_embed)
                 self.u_embed_list.append(u_embed)
                 self.conv_list.append(
                     MetaLayer(
-                        Megnet_EdgeModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
-                        Megnet_NodeModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
-                        Megnet_GlobalModel(dim3, self.batch_track_stats, self.dropout_rate, gc_fc_count),
+                        Megnet_EdgeModel(dim3, self.dropout_rate, gc_fc_count),
+                        Megnet_NodeModel(dim3, self.dropout_rate, gc_fc_count),
+                        Megnet_GlobalModel(dim3, self.dropout_rate, gc_fc_count),
                     )
                 )
 
