@@ -1,0 +1,17 @@
+Job:
+    run_mode: "Inference"  
+    output_directory: "CALCS/test_SchNet_inference/"
+    target_index: 4      # HOMO-LUMO gap (target index 4) or Dipole moment (target index 0)
+    verbosity: 5
+    
+Model:
+    model: "SchNet"
+    dim1: 100
+    dim2: 100
+    dim3: 150
+    cutoff: 8
+    pre_fc_count: 1
+    gc_count: 4
+    post_fc_count: 3
+    pool: "global_mean_pool"
+    dropout_rate: 0.0

@@ -1,0 +1,28 @@
+Job:
+    run_mode: "Hyperparameter"  
+    output_directory: "CALCS/SchNet_tune_gap/"
+    load_model: "False"
+    hyper_trials: 10
+    hyper_resume: "True"   #resume a previous hyperparameter optimization run
+    target_index: 4      # HOMO-LUMO gap (target index 4) or Dipole moment (target index 0)
+    verbosity: 5
+    
+Model:
+    model: "SchNet"
+    dim1: [32, 64] # [32, 64, 100, 128, 256]
+    dim2: 32   # [32, 64] # [32, 64, 100, 128, 256]
+    dim3: 32   # [32, 64] # [32, 64, 100, 128, 256]
+    cutoff: 8      # [5, 8, 10]
+    pre_fc_count: 1
+    gc_count: 1    # [1, 2]  # [1, 2, 3, 4, 5, 6]
+    post_fc_count: 1     # [1, 2]  # [1, 2, 3, 4, 5, 6]
+    pool: "global_mean_pool"     # ["global_mean_pool", "global_add_pool", "global_max_pool"]
+    dropout_rate: 0.0       # [0.0, 0.2, 0.4]
+    num_epochs: 1000
+    lr: 0.0005     # [0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
+    batch_size: 5000     # [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]     # for NVIDIA A100's
+    optimizer: "AdamW"
+    optimizer_args: {}
+    scheduler: "ReduceLROnPlateau"
+    scheduler_args: {"mode":"min", "factor":0.9, "patience":10, "min_lr":0.00001, "threshold":0.0002}
+    early_stopping_patience: 50
