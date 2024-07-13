@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt 
 
 def train(model, train_loader, optimizer, criterion, device):
@@ -50,3 +51,25 @@ def plot_training_validation_cost(training_cost, validation_cost, ylogBoolean, S
     if SHOWPLOTS:
         plt.show()
     return fig
+
+
+def inference(model, data_loader, device):
+    model.eval()
+    results = []
+
+    with torch.no_grad():
+        for data in data_loader:
+            data = data.to(device)
+            output = model(data)
+            # Assuming data.id and data.value are accessible attributes
+            for i in range(len(data.id)):
+                result = {
+                    'id': data.id[i].item(),  # Convert to Python scalar
+                    'value': data.value[i].item(),  # Convert to Python scalar
+                    'output': output[i].item()  # Convert to Python scalar
+                }
+                results.append(result)
+
+    # Convert results list to DataFrame
+    df = pd.DataFrame(results)
+    return df
