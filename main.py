@@ -51,7 +51,14 @@ def construct_GNN_model(config, data_instance):
     return model 
 
 
-def run_training_mode(config, train_loader, val_loader, test_loader, device):
+def run_training_mode(config, device):
+    # Load the QM9 dataset
+    dataset = QM9Dataset(root='./data/QM9', batch_size=config['Model']['batch_size'])
+    dataset.process_dataset(target=config['Job']['target_index'])
+    # dataset.print_instance()
+    train_loader, val_loader, test_loader = dataset.get_dataloaders()
+    torch.cuda.empty_cache()
+
     # Construct the GNN model
     model = construct_GNN_model(config, next(iter(train_loader)))
     if (device.type == 'cuda') or (device.type == 'mps'):
@@ -137,12 +144,19 @@ def run_predict_mode():
     return
 
 
-def train_func_for_tune(one_config_simplified, train_loader=None, val_loader=None, device=None):
+def train_func_for_tune(one_config_simplified, device=None):
     # one_config_simplified only contains the ['Model'] section
     temp_one_config = {
         'Job': {'load_model': "False"}, 
         'Model': one_config_simplified, 
     }
+
+    # Load the QM9 dataset
+    dataset = QM9Dataset(root='./data/QM9', batch_size=temp_one_config['Model']['batch_size'])
+    dataset.process_dataset(target=temp_one_config['Job']['target_index'])
+    # dataset.print_instance()
+    train_loader, val_loader, test_loader = dataset.get_dataloaders()
+    torch.cuda.empty_cache()
 
     # Construct the GNN model
     model = construct_GNN_model(temp_one_config, next(iter(train_loader)))
@@ -184,7 +198,7 @@ def train_func_for_tune(one_config_simplified, train_loader=None, val_loader=Non
             break
 
 
-def run_hyperparameter_mode(config, train_loader, val_loader, device): 
+def run_hyperparameter_mode(config, device): 
     # construct tune_config from config that is read in, extract the "Model" part of the config
     model_config = config['Model']
     tune_config = {}
@@ -208,7 +222,7 @@ def run_hyperparameter_mode(config, train_loader, val_loader, device):
 
     # Start hyperparameter tuning with Ray Tune
     analysis = tune.run(
-        tune.with_parameters(train_func_for_tune, train_loader=train_loader, validation_loader=val_loader, device=device),
+        tune.with_parameters(train_func_for_tune, device=device),
         config=tune_config,
         num_samples=config['Job']['hyper_trials'],
         scheduler=scheduler,
@@ -233,7 +247,7 @@ def run_hyperparameter_mode(config, train_loader, val_loader, device):
     return
 
 
-def run_hyperparameter_mode_manual(config, train_loader, val_loader, device): 
+def run_hyperparameter_mode_manual(config): 
     # Check if any value in config['Job'] is a list
     for key, value in config['Job'].items():
         if isinstance(value, list):
@@ -272,7 +286,7 @@ def run_hyperparameter_mode_manual(config, train_loader, val_loader, device):
 #SBATCH -q shared
 #SBATCH -t 6:00:00
 #SBATCH -J GNN_manual_tune_trial_{i}
-#SBATCH -o {trial_dir}/GNN_manual_tune_trial_{i}.log
+#SBATCH -o {trial_dir}GNN_manual_tune_trial_{i}.log
 #SBATCH -n 1
 #SBATCH -c 32
 #SBATCH --gpus-per-task=1
@@ -283,12 +297,10 @@ export SLURM_CPU_BIND="cores"
 srun python main.py {one_config_path}
 """)
 
-        # Make the script executable
-        # os.chmod(script_path, 0o755)
-
         # Submit jobs using sbatch
         subprocess.run(['sbatch', 'submit_job_manualTune.sh'])
-        time.sleep(3)
+        # time.sleep(3)
+    os.remove('submit_job_manualTune.sh')
 
     return
 
@@ -326,19 +338,12 @@ def main(config_filename):
     except Exception as e:
         print(f"Error occurred while deleting directory {config['Job']['output_directory']}: {e}\n")
     os.makedirs(config['Job']['output_directory'], exist_ok = True)
-
-    # Load the QM9 dataset
-    dataset = QM9Dataset(root='./data/QM9', batch_size=config['Model']['batch_size'])
-    dataset.process_dataset(target=config['Job']['target_index'])
-    # dataset.print_instance()
-    train_loader, val_loader, test_loader = dataset.get_dataloaders()
-    torch.cuda.empty_cache()
     
     if config['Job']['run_mode'] == 'Training':
-        test_loss = run_training_mode(config, train_loader, val_loader, test_loader, device)
+        test_loss = run_training_mode(config, device)
     elif config['Job']['run_mode'] == 'Hyperparameter':
-        # run_hyperparameter_mode(config, train_loader, val_loader, device)
-        run_hyperparameter_mode_manual(config, train_loader, val_loader, device)
+        # run_hyperparameter_mode(config, device)
+        run_hyperparameter_mode_manual(config)
     elif config['Job']['run_mode'] == 'Inference':
         run_inference_mode(config, device)
     else:
