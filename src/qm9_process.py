@@ -1,26 +1,35 @@
+import os
 import torch
 from torch_geometric.datasets import QM9
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Distance
 from sklearn.preprocessing import StandardScaler
-import os
+from rdkit import Chem
+from rdkit.Chem import rdmolfiles, rdmolops
 
 class QM9Dataset:
-    def __init__(self, root, batch_size=32):
+    def __init__(self, root, batch_size=32, verbosity=0):
         self.root = root
         self.batch_size = batch_size
 
         self.dataset = QM9(self.root, pre_transform=Distance())
         print(f"Number of data instances: {len(self.dataset)}\n")
 
+        if verbosity>0:
+            for attr_name, attr_value in self.dataset[0]:
+                print(f"\t{attr_name}: {attr_value}")
 
-    def process_dataset(self, target=4, verbosity=0):
+
+    def process_dataset(self, target=4, procSMILES=False, verbosity=0):
         # Extract either HOMO-LUMO gap (target index 4) or Dipole moment (target index 0)
         processed_dataset = []
 
         for data in self.dataset:
-            gap = data.y[:, target].unsqueeze(0)  # Extract only the target data
-            data.y = gap
+            if isinstance(target, list):
+                gaps = data.y[:, target]  # Extract the specified targets
+            else:
+                gaps = data.y[:, target].unsqueeze(0)  # Extract only the target data
+            data.y = gaps
 
             # Set num_node_features and num_edge_features
             data.num_node_features = data.x.size(1)  # Number of features per node
@@ -32,6 +41,14 @@ class QM9Dataset:
             # Handle edge_weight
             if data.edge_weight is None:
                 data.edge_weight = torch.ones_like(data.edge_index[0])  # Set edge weights to 1.0 if not provided
+            
+            # Generate SMILES string
+            if procSMILES:
+                if int(data.name.split("_")[-1]) != data.idx.item()+1: 
+                    raise ValueError(f"{int(data.name.split('_')[-1])} and {data.idx.item()+1} Please check QM9 database molecule indexing order. Aborting. ")
+                data.smiles = generate_smiles(data.idx.item()+1)
+            else: 
+                data.smiles = None
 
             processed_dataset.append(data)
 
@@ -65,15 +82,37 @@ class QM9Dataset:
         for i, data in enumerate(self.dataset):
             if i < numMolPrint:
                 print(f"\tProcessed QM9 Data ({i}-th Instance):")
-                print(f"\tNumber of nodes (atoms): {data.num_nodes}")
-                print(f"\tNumber of edges (bonds): {data.num_edges}")
-                print(f"\tNode features (x): {data.x}")
-                print(f"\tEdge indices (edge_index): {data.edge_index}")
-                print(f"\tEdge weights (edge_weight): {data.edge_weight if data.edge_weight is not None else 'None'}")
-                print(f"\tEdge attributes (edge_attr): {data.edge_attr}")
-                print(f"\tAtomic positions (pos): {data.pos}") 
-                print(f"\tAtomic numbers (z): {data.z}") 
-                print(f"\tSMILES representation (smiles): {data.smiles}") 
-                print(f"\tTarget values (y): {data.y}")  # This could be properties like HOMO-LUMO gap
+                # print(f"\tNumber of nodes (atoms): {data.num_nodes}")
+                # print(f"\tNumber of edges (bonds): {data.num_edges}")
+                # print(f"\tNode features (x): {data.x}")
+                # print(f"\tEdge indices (edge_index): {data.edge_index}")
+                # print(f"\tEdge weights (edge_weight): {data.edge_weight if data.edge_weight is not None else 'None'}")
+                # print(f"\tEdge attributes (edge_attr): {data.edge_attr}")
+                # print(f"\tAtomic positions (pos): {data.pos}") 
+                # print(f"\tAtomic numbers (z): {data.z}") 
+                # print(f"\tSMILES representation (smiles): {data.smiles}") 
+                # print(f"\tTarget values (y): {data.y}")  # This could be properties like HOMO-LUMO gap
+
+                for attr_name, attr_value in data:
+                    print(f"\t{attr_name}: {attr_value}")
+
                 print("=" * 80)
 
+
+def generate_smiles(gdbIdx, dsgdb9nsdDir="dsgdb9nsd/"):
+    file_path = f"{dsgdb9nsdDir}dsgdb9nsd_{gdbIdx:06d}.xyz"
+    
+    try:
+        with open(file_path, 'r') as file:
+            natom = int(file.readline().strip())
+            target_line_index = natom + 3 - 1
+            
+            for current_line_index, line in enumerate(file):
+                if current_line_index == target_line_index:
+                    smiles = line.split()[0]
+                    return smiles
+                    
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+    except Exception as e:
+        print(f"An error occurred: {e}")

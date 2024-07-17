@@ -1,8 +1,10 @@
 Job:
     run_mode: "Inference"  
-    output_directory: "CALCS/test_SchNet_inference/"
+    output_directory: "CALCS/SchNet_gap_inference/"
+    load_model: "True"
     target_index: 4      # HOMO-LUMO gap (target index 4) or Dipole moment (target index 0)
     verbosity: 5
+    clear_dir: 0
     
 Model:
     model: "SchNet"
@@ -15,3 +17,4 @@ Model:
     post_fc_count: 3
     pool: "global_mean_pool"
     dropout_rate: 0.0
+    batch_size: 4096

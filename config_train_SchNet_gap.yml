@@ -4,6 +4,7 @@ Job:
     load_model: "False"
     target_index: 4      # HOMO-LUMO gap (target index 4) or Dipole moment (target index 0)
     verbosity: 5
+    clear_dir: 1
     
 Model:
     model: "SchNet"

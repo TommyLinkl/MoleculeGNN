@@ -20,3 +20,5 @@ export SLURM_CPU_BIND="cores"
 # ray stop
 
 # nohup python main.py config_tune_SchNet_gap.yml > GNN_tune_SchNet_manual.log &
+
+# nohup python main.py config_inference_SchNet_gap.yml > GNN_inference_SchNet.log &

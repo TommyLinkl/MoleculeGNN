@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
+import json
+import pandas as pd
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
@@ -45,7 +47,10 @@ def construct_GNN_model(config, data_instance):
 
     if (config['Job']['load_model']=='True'):
         checkpoint = torch.load(f"{config['Job']['output_directory']}init_model.pth")
-        model.load_state_dict(checkpoint['state_dict'])
+
+        # Remove 'module.' prefix from keys if model was trained with DataParallel
+        state_dict = {k.replace('module.', ''): v for k, v in checkpoint['state_dict'].items()}
+        model.load_state_dict(state_dict)        # model.load_state_dict(checkpoint['state_dict'])
         print("The GNN model is initialized by loading from the existing state_dict file.")
     
     return model 
@@ -269,6 +274,7 @@ def run_hyperparameter_mode_manual(config):
         one_config = copy.deepcopy(config)
         one_config['Job']['run_mode'] = "Training"
         one_config['Job']['output_directory'] = trial_dir
+        one_config['Job']['clear_dir'] = 0
         if 'hyper_trials' in one_config['Job']:
             del one_config['Job']['hyper_trials']
         if 'hyper_resume' in one_config['Job']:
@@ -305,8 +311,75 @@ srun python main.py {one_config_path}
     return
 
 
-def run_inference_mode(config, device):
-    return
+def run_inference_mode(config, device, writeFileAs='JSON'):
+    dataset = QM9Dataset(root='./data/QM9', batch_size=1)
+    dataset.process_dataset(target=config['Job']['target_index'], procSMILES=True)
+    loader, _, _ = dataset.get_dataloaders(split_ratio=(1.0, 0.0, 0.0))
+    torch.cuda.empty_cache()
+    # dataset.print_instance()
+
+    if config['Job']['target_index'] == 0:
+        property = 'dipMom'
+    elif config['Job']['target_index'] == 4: 
+        property = 'gap'
+
+    model = construct_GNN_model(config, next(iter(loader)))
+    if device.type in ['cuda', 'mps']:
+        model = nn.DataParallel(model)
+    model = model.to(device)
+
+    start_time = time.time()
+    model.eval()
+    results = []
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            output = model(data)
+
+            # Process each data instance in the batch
+            result = {
+                'idx': data.idx[0].item(), 
+                'name': data.name[0], 
+                'atom_types': data.z.cpu().tolist(), 
+                'num_atoms': data.num_nodes, 
+                f'ref_{property}': data.y[0,0].item(), 
+                f'pred_{property}': output[0].item(),
+            }
+            results.append(result)
+    end_time = time.time()
+    print(f"Inference on all molecules. Runtime: {end_time - start_time:.3f}s")
+
+    start_time = time.time()
+    inference_results_df = pd.DataFrame(results)
+    inference_results_df = inference_results_df.sort_values(by='idx')
+    if writeFileAs=='JSON':
+        # Save the DataFrame to a JSON file
+        inference_results_json = inference_results_df.to_json(orient='records')
+
+        # Custom JSON encoder to handle the specific formatting
+        class CustomJSONEncoder(json.JSONEncoder):
+            def iterencode(self, obj, _one_shot=False):
+                if isinstance(obj, list):
+                    return '[' + ','.join(json.dumps(el) for el in obj) + ']'
+                else:
+                    return super().iterencode(obj, _one_shot)
+
+        # Use the custom JSON encoder to format the output
+        formatted_json = json.dumps(json.loads(inference_results_json), indent=4, cls=CustomJSONEncoder)
+
+        # Save the formatted JSON string to a file
+        with open(f"{config['Job']['output_directory']}inference_results.json", 'w') as f:
+            f.write(formatted_json)
+    elif writeFileAs=='CSV':
+        # Save DataFrame to CSV
+        inference_results_df.to_csv(f"{config['Job']['output_directory']}inference_results.csv", index=False)
+    else: 
+        raise NotImplementedError("Only support writing to JSON or CSV files. ")
+    end_time = time.time()
+    print(f"Writing inference results to file. Runtime: {end_time - start_time:.3f}s")
+
+    return inference_results_df
+
 
 
 def main(config_filename):
@@ -329,14 +402,15 @@ def main(config_filename):
     with open(config_filename, 'r') as file:
         config = yaml.safe_load(file)
     print(f"Done reading in the {config_filename} file. The job type is {config['Job']['run_mode']}. The model is {config['Model']['model']}.")
-    try:
-        if os.path.exists(f"{config['Job']['output_directory']}"):
-            shutil.rmtree(f"{config['Job']['output_directory']}")
-            print(f"Directory {config['Job']['output_directory']} and its contents successfully deleted\n")
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        print(f"Error occurred while deleting directory {config['Job']['output_directory']}: {e}\n")
+    if bool(config['Job']['clear_dir']):
+        try:
+            if os.path.exists(f"{config['Job']['output_directory']}"):
+                shutil.rmtree(f"{config['Job']['output_directory']}")
+                print(f"Directory {config['Job']['output_directory']} and its contents successfully deleted\n")
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"Error occurred while deleting directory {config['Job']['output_directory']}: {e}\n")
     os.makedirs(config['Job']['output_directory'], exist_ok = True)
     
     if config['Job']['run_mode'] == 'Training':
