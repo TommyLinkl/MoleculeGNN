@@ -11,6 +11,7 @@ from ray.tune.schedulers import ASHAScheduler
 from src.models_gnn import SchNet, MEGNet
 from src.qm9_process import QM9Dataset
 from src.train_eval import train, evaluate, plot_training_validation_cost
+from src.analysis import functional_groups, identify_functional_groups, plot_by_values, plot_by_chemGroups, plot_by_heaviestAtom, plot_by_molMass
 
 def construct_GNN_model(config, data_instance):
     default_SchNet_params = {
@@ -336,12 +337,16 @@ def run_inference_mode(config, device, writeFileAs='JSON'):
             data = data.to(device)
             output = model(data)
 
+            groups = identify_functional_groups(data.smiles[0])
+            
             # Process each data instance in the batch
             result = {
                 'idx': data.idx[0].item(), 
                 'name': data.name[0], 
                 'atom_types': data.z.cpu().tolist(), 
                 'num_atoms': data.num_nodes, 
+                'smiles': data.smiles[0], 
+                'functional_groups': groups,
                 f'ref_{property}': data.y[0,0].item(), 
                 f'pred_{property}': output[0].item(),
             }
@@ -354,22 +359,7 @@ def run_inference_mode(config, device, writeFileAs='JSON'):
     inference_results_df = inference_results_df.sort_values(by='idx')
     if writeFileAs=='JSON':
         # Save the DataFrame to a JSON file
-        inference_results_json = inference_results_df.to_json(orient='records')
-
-        # Custom JSON encoder to handle the specific formatting
-        class CustomJSONEncoder(json.JSONEncoder):
-            def iterencode(self, obj, _one_shot=False):
-                if isinstance(obj, list):
-                    return '[' + ','.join(json.dumps(el) for el in obj) + ']'
-                else:
-                    return super().iterencode(obj, _one_shot)
-
-        # Use the custom JSON encoder to format the output
-        formatted_json = json.dumps(json.loads(inference_results_json), indent=4, cls=CustomJSONEncoder)
-
-        # Save the formatted JSON string to a file
-        with open(f"{config['Job']['output_directory']}inference_results.json", 'w') as f:
-            f.write(formatted_json)
+        inference_results_df.to_json(f"{config['Job']['output_directory']}inference_results.json", orient='records', lines=True)
     elif writeFileAs=='CSV':
         # Save DataFrame to CSV
         inference_results_df.to_csv(f"{config['Job']['output_directory']}inference_results.csv", index=False)
@@ -380,6 +370,25 @@ def run_inference_mode(config, device, writeFileAs='JSON'):
 
     return inference_results_df
 
+
+def run_analysis(config, df):
+    if config['Job']['target_index'] == 0:
+        property = 'dipMom'
+    elif config['Job']['target_index'] == 4: 
+        property = 'gap'
+
+    fig = plot_by_values(property, df)
+    fig.savefig(f"{config['Job']['output_directory']}plot_by_values.pdf")
+
+    fig = plot_by_molMass(property, df)
+    fig.savefig(f"{config['Job']['output_directory']}plot_by_molMass.pdf")
+
+    fig = plot_by_heaviestAtom(property, df)
+    fig.savefig(f"{config['Job']['output_directory']}plot_by_heaviestAtom.pdf")
+
+    fig = plot_by_chemGroups(property, df)
+    fig.savefig(f"{config['Job']['output_directory']}plot_by_chemGroups.pdf")
+    return
 
 
 def main(config_filename):
@@ -419,7 +428,10 @@ def main(config_filename):
         # run_hyperparameter_mode(config, device)
         run_hyperparameter_mode_manual(config)
     elif config['Job']['run_mode'] == 'Inference':
-        run_inference_mode(config, device)
+        df = run_inference_mode(config, device)   # Comment out only when DEBUGGING
+        df = pd.read_json(f"{config['Job']['output_directory']}inference_results.json", lines=True)
+
+        run_analysis(config, df)
     else:
         raise NotImplementedError(f"The job run_mode of '{config['Job']['run_mode']}' is not implemented.")
 
